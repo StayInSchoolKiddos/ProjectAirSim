@@ -90,6 +90,10 @@ class AUnrealScene : public AActor {
                                     FOrientedBox& OrientedBox,
                                     FRotator& OutRotation) const;
 
+  // PIE-independent identity of the loaded map, cached before RPC publication.
+  std::string LoadedMapPackage;
+  std::string GetLoadedMapPackageServiceMethod();
+
   void RegisterServiceMethods();
 
   bool SwitchStreamingViewServiceMethod();

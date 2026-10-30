@@ -30,6 +30,7 @@
 #include "Sensors/UnrealCamera.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UnrealHelpers.h"
+#include "UObject/Package.h"
 #include "UnrealLogger.h"
 #include "World/WeatherLib.h"
 #include "World/WorldSimApi.h"
@@ -209,6 +210,10 @@ void AUnrealScene::LoadUnrealScene(
       });
 
   unreal_world = World;
+  // Capture on the game thread before service registration. RPCs only read this
+  // immutable package identity, never dereference UObjects off the game thread.
+  LoadedMapPackage = TCHAR_TO_UTF8(
+      *UWorld::RemovePIEPrefix(World->GetOutermost()->GetName()));
   sim_scene = &Scene;
 
   RegisterServiceMethods();
@@ -957,7 +962,16 @@ void AUnrealScene::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   Super::EndPlay(EndPlayReason);
 }
 
+std::string AUnrealScene::GetLoadedMapPackageServiceMethod() {
+  return LoadedMapPackage;
+}
+
 void AUnrealScene::RegisterServiceMethods() {
+  auto get_loaded_map = projectairsim::ServiceMethod("GetLoadedMapPackage", {});
+  auto get_loaded_map_handler = get_loaded_map.CreateMethodHandler(
+      &AUnrealScene::GetLoadedMapPackageServiceMethod, *this);
+  sim_scene->RegisterServiceMethod(get_loaded_map, get_loaded_map_handler);
+
   if (sim_scene && !sim_scene->GetVRMode()) {
     //! Register "SwitchStreamingView" as a service method through sim scene
     auto switch_streaming_view =
