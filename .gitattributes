@@ -10,3 +10,6 @@
 *.cmd text eol=crlf
 
 *.sln text eol=crlf
+
+# Stable bytes for the camera source asset pinned by MIDE Forge payload packages.
+unreal/Blocks/Plugins/ProjectAirSim/Source/ProjectAirSim/Private/Sensors/UnrealCamera.cpp text eol=crlf

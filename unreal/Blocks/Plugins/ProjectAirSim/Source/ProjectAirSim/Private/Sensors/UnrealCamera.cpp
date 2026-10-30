@@ -739,7 +739,7 @@ void UUnrealCamera::TickComponent(
          ++ImageTypeInt) {
       // Only capture the scene for the image type if someone wants it
       bool bEnable = SimCamera.HasSubscribers(ImageTypeInt);
-      // Get active(enabled) capture component to call CaptureSceneDeferred()
+      // Get the active capture component for this subscribed image type.
       USceneCaptureComponent2D* Capture = GetCaptureComponent(
           static_cast<projectairsim::ImageType>(ImageTypeInt), true);
 
@@ -750,18 +750,20 @@ void UUnrealCamera::TickComponent(
                                  projectairsim::ImageType>(ImageTypeInt),
                              bEnable);
 
-        // When the capture component is just activated,
-        // CaptureSceneDeferred() doesn't seem to capture an image until the
-        // next tick so we'll manually capture the scene now
+        // Resolve the newly enabled component; capture it once below.
         if (bEnable) {
           Capture = GetCaptureComponent(
               static_cast<projectairsim::ImageType>(ImageTypeInt), false);
-          Capture->CaptureScene();
         }
       }
 
       if (bEnable) {
-        Capture->CaptureSceneDeferred();
+        // Submit rendering before enqueueing SceneDrawCompletion below.
+        // Deferred capture only registers a later update: reading back now
+        // would pair the previous render target with this capture's pose/time.
+        // CaptureScene submits the render work; readback follows on the same
+        // render command queue without a game-thread GPU flush.
+        Capture->CaptureScene();
         bCaptureIsActive = true;
       }
     }
