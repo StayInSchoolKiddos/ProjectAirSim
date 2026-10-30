@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "json.hpp"
 #include "message/common_utils.hpp"
 #include "msgpack.hpp"
 
@@ -164,4 +165,38 @@ TEST(ImageMessage, Serializes4KPayloadWithLegacyWireSchema) {
 
   VerifyImageSerializationMatchesLegacy(13579, 2160, 3840, "BGR", false, 3,
                                         std::move(data));
+}
+
+
+TEST(ImageMessage, OptionalPerformanceTimingRoundTripAndLegacyRead) {
+  projectairsim::ImageMessage image(20, 1, 1, "BGR", false, 3,
+      std::vector<uint8_t>{1, 2, 3}, 0, 0, 0, 1, 0, 0, 0);
+  const std::vector<uint64_t> timing{1, 100, 200, 300, 10000000, 7};
+  image.SetPerformanceTiming(timing);
+  projectairsim::ImageMessage decoded;
+  decoded.Deserialize(image.Serialize());
+  EXPECT_EQ(decoded.GetData()["performance_timing"], timing);
+  EXPECT_EQ(decoded.GetPixelVector(), (std::vector<uint8_t>{1, 2, 3}));
+  // Older consumers ignore the additive map field.
+  LegacyImageMessageWire legacy;
+  const auto wire = image.Serialize();
+  msgpack::unpack(wire.data(), wire.size()).get().convert(legacy);
+  EXPECT_EQ(legacy.data, (std::vector<uint8_t>{1, 2, 3}));
+  image.SetPerformanceTiming({});
+  decoded.Deserialize(image.Serialize());
+  EXPECT_TRUE(decoded.GetData()["performance_timing"].empty());
+}
+#include "core_sim/capture_schedule.hpp"
+TEST(CaptureSchedule, ExactDeadlineNoDriftOrCatchupBurst) {
+  microsoft::projectairsim::CaptureSchedule schedule;
+  EXPECT_FALSE(schedule.Due(0, 20));
+  EXPECT_TRUE(schedule.Due(20, 20));
+  EXPECT_FALSE(schedule.Due(20, 20));
+  EXPECT_TRUE(schedule.Due(47, 20));
+  EXPECT_FALSE(schedule.Due(59, 20));
+  EXPECT_TRUE(schedule.Due(60, 20));
+  EXPECT_TRUE(schedule.Due(200, 20));
+  EXPECT_FALSE(schedule.Due(200, 20));
+  EXPECT_FALSE(schedule.Due(0, 20));
+  EXPECT_TRUE(schedule.Due(20, 20));
 }

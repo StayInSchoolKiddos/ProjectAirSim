@@ -90,6 +90,11 @@ class ImageMessage : public Message {
 
   ~ImageMessage() override;
 
+  // Optional Windows QPC timing: version, capture, readback, publication,
+  // frequency, capture sequence. Empty preserves legacy behavior.
+  void SetPerformanceTiming(const std::vector<uint64_t>& timing);
+  void MarkPerformancePublication();
+
   TimeNano GetTimestamp() const;
 
   uint32_t GetHeight() const;

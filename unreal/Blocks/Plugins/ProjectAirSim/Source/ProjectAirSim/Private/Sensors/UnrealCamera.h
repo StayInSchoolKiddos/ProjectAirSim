@@ -17,6 +17,7 @@
 #include "Materials/Material.h"
 #include "UnrealSensor.h"
 #include "core_sim/clock.hpp"
+#include "core_sim/capture_schedule.hpp"
 #include "core_sim/sensors/camera.hpp"
 
 // comment so that generated.h is always the last include file with clang-format
@@ -153,9 +154,13 @@ class UUnrealCamera : public UUnrealSensor {
       USceneCaptureComponent2D* TargetCaptureComponent,
       const microsoft::projectairsim::CaptureSettings& CaptureSetting);
 
+  bool bPerformanceTiming = false;
+  uint64 PerformanceCaptureSequence = 0;
+
   void OnRendered(
       microsoft::projectairsim::Transform CapturedCameraTransform,
-      std::vector<microsoft::projectairsim::Annotation> Annotations);
+      std::vector<microsoft::projectairsim::Annotation> Annotations,
+      std::vector<uint64_t> PerformanceTiming);
 
   // For bounding box calculations
   void CalculateProjectionMatrix();
@@ -204,6 +209,7 @@ class UUnrealCamera : public UUnrealSensor {
   // settings
   std::vector<bool> CameraTypeEnabled;
   float CaptureIntervalSec = 0.0f;
+  microsoft::projectairsim::CaptureSchedule CaptureDeadlines;
   std::vector<ImageRequest> CaptureRequests;
 
   // true when there is a pending image capture

@@ -5,6 +5,9 @@
 #include "jsbsim_api.hpp"
 
 #include <mutex>
+#include <cmath>
+#include <stdexcept>
+#include <unordered_set>
 
 #include "json.hpp"
 
@@ -75,6 +78,40 @@ float JSBSimApi::GetJSBSimPropertyUnlocked(const std::string& property) {
   return sim_robot_.GetJSBSimModel()->GetPropertyValue(property);
 }
 
+std::vector<float> JSBSimApi::GetJSBSimProperties(
+    const std::vector<std::string>& properties) {
+  if (properties.empty() || properties.size() > 64) {
+    throw std::invalid_argument("Expected 1..64 JSBSim properties");
+  }
+  std::lock_guard<std::mutex> lock(jsbsim_property_mutex_);
+  std::vector<float> values;
+  values.reserve(properties.size());
+  for (const auto& property : properties) {
+    values.push_back(GetJSBSimPropertyUnlocked(property));
+  }
+  return values;
+}
+
+bool JSBSimApi::SetJSBSimProperties(
+    const std::vector<std::string>& properties, const std::vector<float>& values) {
+  if (properties.empty() || properties.size() > 64 ||
+      properties.size() != values.size()) {
+    throw std::invalid_argument("Expected matching 1..64 properties and values");
+  }
+  std::unordered_set<std::string> unique;
+  for (size_t i = 0; i < properties.size(); ++i) {
+    if (properties[i].empty() || !unique.insert(properties[i]).second ||
+        !std::isfinite(values[i])) {
+      throw std::invalid_argument("Invalid or duplicate JSBSim property/value");
+    }
+  }
+  std::lock_guard<std::mutex> lock(jsbsim_property_mutex_);
+  for (size_t i = 0; i < properties.size(); ++i) {
+    SetJSBSimPropertyUnlocked(properties[i], values[i]);
+  }
+  return true;
+}
+
 bool JSBSimApi::SetJSBSimPropertyUnlocked(const std::string& property,
                                           float value) {
   sim_robot_.GetJSBSimModel()->SetPropertyValue(property, value);
@@ -82,6 +119,12 @@ bool JSBSimApi::SetJSBSimPropertyUnlocked(const std::string& property,
 }
 
 void JSBSimApi::RegisterServiceMethods() {
+  auto batch_get = ServiceMethod("GetJSBSimProperties", {"_property_names"});
+  sim_robot_.RegisterServiceMethod(batch_get,
+      batch_get.CreateMethodHandler(&JSBSimApi::GetJSBSimProperties, *this));
+  auto batch_set = ServiceMethod("SetJSBSimProperties", {"_property_names", "_values"});
+  sim_robot_.RegisterServiceMethod(batch_set,
+      batch_set.CreateMethodHandler(&JSBSimApi::SetJSBSimProperties, *this));
   auto method = ServiceMethod("GetJSBSimProperty", {"_property_name"});
   auto method_handler =
       method.CreateMethodHandler(&JSBSimApi::GetJSBSimProperty, *this);

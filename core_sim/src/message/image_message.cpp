@@ -5,6 +5,12 @@
 
 #include "core_sim/message/image_message.hpp"
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#endif
 #include <memory>
 #include <string>
 
@@ -84,9 +90,11 @@ class ImageMessage::Impl : public MessageImpl {
 
   const std::vector<Annotation> GetAnnotations() const;
 
+  std::vector<uint64_t> performance_timing;
+
   MSGPACK_DEFINE_MAP(time_stamp, height, width, encoding, big_endian, step,
                      data, pos_x, pos_y, pos_z, rot_w, rot_x, rot_y, rot_z,
-                     annotations);
+                     annotations, performance_timing);
 
  private:
   TimeNano time_stamp;
@@ -126,6 +134,20 @@ ImageMessage::ImageMessage(TimeNano time_stamp_val, uint32_t height_val,
           rot_w_val, rot_x_val, rot_y_val, rot_z_val, annotations)) {}
 
 ImageMessage::~ImageMessage() {}
+
+void ImageMessage::SetPerformanceTiming(const std::vector<uint64_t>& timing) {
+  static_cast<ImageMessage::Impl*>(pimpl_.get())->performance_timing = timing;
+}
+
+void ImageMessage::MarkPerformancePublication() {
+#if defined(_WIN32)
+  auto& timing = static_cast<ImageMessage::Impl*>(pimpl_.get())->performance_timing;
+  if (timing.size() == 6 && timing[0] == 1) {
+    LARGE_INTEGER now;
+    if (QueryPerformanceCounter(&now)) timing[3] = now.QuadPart;
+  }
+#endif
+}
 
 TimeNano ImageMessage::GetTimestamp() const {
   return static_cast<ImageMessage::Impl*>(pimpl_.get())->GetTimestamp();
@@ -228,13 +250,33 @@ std::string ImageMessage::Impl::Serialize() {
   StringAppendBuffer buffer(
       EstimateImageMessagePackSize(data.size(), encoding.size(), annotations.size()));
   msgpack::packer<StringAppendBuffer> packer(buffer);
-  this->msgpack_pack(packer);
+  // Preserve the exact legacy wire format when profiling is disabled.
+  packer.pack_map(performance_timing.empty() ? 15 : 16);
+  packer.pack("time_stamp"); packer.pack(time_stamp);
+  packer.pack("height"); packer.pack(height);
+  packer.pack("width"); packer.pack(width);
+  packer.pack("encoding"); packer.pack(encoding);
+  packer.pack("big_endian"); packer.pack(big_endian);
+  packer.pack("step"); packer.pack(step);
+  packer.pack("data"); packer.pack(data);
+  packer.pack("pos_x"); packer.pack(pos_x);
+  packer.pack("pos_y"); packer.pack(pos_y);
+  packer.pack("pos_z"); packer.pack(pos_z);
+  packer.pack("rot_w"); packer.pack(rot_w);
+  packer.pack("rot_x"); packer.pack(rot_x);
+  packer.pack("rot_y"); packer.pack(rot_y);
+  packer.pack("rot_z"); packer.pack(rot_z);
+  packer.pack("annotations"); packer.pack(annotations);
+  if (!performance_timing.empty()) {
+    packer.pack("performance_timing"); packer.pack(performance_timing);
+  }
   return buffer.Take();
 }
 
 void ImageMessage::Impl::Deserialize(const std::string& buffer) {
   auto handle = msgpack::unpack(buffer.data(), buffer.size());
   auto object = handle.get();
+  performance_timing.clear();
   this->msgpack_unpack(object);
 }
 
@@ -253,7 +295,7 @@ json ImageMessage::Impl::GetData() const {
                {"rot_x", rot_x},
                {"rot_y", rot_y},
                {"rot_z", rot_z},
-               {"annotations", GetAnnotations()}});
+               {"annotations", GetAnnotations()}, {"performance_timing", performance_timing}});
 }
 
 std::vector<uint8_t> &ImageMessage::Impl::GetPixelVector() {

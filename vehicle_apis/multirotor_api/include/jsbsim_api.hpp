@@ -49,6 +49,11 @@ class JSBSimApi : public IController {
 
   float GetJSBSimProperty(const std::string& property);
   bool SetJSBSimProperty(const std::string& property, float value);
+  // Coherent against property API writes. Call while physics is paused to obtain
+  // a single physics-state snapshot; this mutex does not pause the physics loop.
+  std::vector<float> GetJSBSimProperties(const std::vector<std::string>& properties);
+  bool SetJSBSimProperties(const std::vector<std::string>& properties,
+                          const std::vector<float>& values);
 
  private:
   friend class JSBSimApiTestPeer;

@@ -7,6 +7,7 @@
 #include "UnrealCamera.h"
 
 #include <string>
+#include <cmath>
 #include <utility>
 #include <vector>
 
@@ -652,6 +653,9 @@ void UUnrealCamera::SetCameraTypeEnabled(projectairsim::ImageType Type,
 
 void UUnrealCamera::BeginPlay() {
   Super::BeginPlay();
+#if PLATFORM_WINDOWS
+  bPerformanceTiming = FPlatformMisc::GetEnvironmentVariable(TEXT("MIDE_CAMERA_PROFILE")) == TEXT("1");
+#endif
 
   projectairsim::Transform BeginPlayPose = UnrealTransform::GetPoseNed(this);
   UnrealLogger::Log(
@@ -728,12 +732,16 @@ void UUnrealCamera::TickComponent(
   // -----------------------------------------------------------------------
   // Start a new set of image captures if ready to take the next one.
 
-  const TimeSec SimTimeElapsedSec = projectairsim::SimClock::Get()->NanosToSec(
-      PoseUpdatedTimeStamp - CapturedTime);
-
-  if (SimTimeElapsedSec > CaptureIntervalSec && bHasNewState &&
-      SimCamera.IsUpdating() && !SimCamera.IsCaptureQueueFull()) {
+  if (bHasNewState && SimCamera.IsUpdating() && !SimCamera.IsCaptureQueueFull() &&
+      CaptureDeadlines.Due(PoseUpdatedTimeStamp,
+          static_cast<int64_t>(std::llround(CaptureIntervalSec * 1e9)))) {
     bool bCaptureIsActive = false;
+    std::vector<uint64_t> PerformanceTiming;
+    if (bPerformanceTiming) {
+      PerformanceTiming = {1, FPlatformTime::Cycles64(), 0, 0,
+          static_cast<uint64_t>(1.0 / FPlatformTime::GetSecondsPerCycle64() + 0.5),
+          ++PerformanceCaptureSequence};
+    }
 
     for (int ImageTypeInt = 0; ImageTypeInt < ImageTypeCount();
          ++ImageTypeInt) {
@@ -795,9 +803,10 @@ void UUnrealCamera::TickComponent(
       // When this render command completes, UUnrealCamera::OnRendered() will
       // be triggered to process and publish the image data
       ENQUEUE_RENDER_COMMAND(SceneDrawCompletion)
-      ([this, CapturedCameraTransform, Annotations = std::move(Annotations)](
+      ([this, CapturedCameraTransform, Annotations = std::move(Annotations),
+        PerformanceTiming = std::move(PerformanceTiming)](
            FRHICommandListImmediate& RHICmdList) {
-        this->OnRendered(CapturedCameraTransform, Annotations);
+        this->OnRendered(CapturedCameraTransform, Annotations, PerformanceTiming);
       });
     }
   }
@@ -909,7 +918,8 @@ bool UUnrealCamera::IsReadyForFinishDestroy() {
 
 void UUnrealCamera::OnRendered(
     projectairsim::Transform CapturedCameraTransform,
-    std::vector<projectairsim::Annotation> Annotations) {
+    std::vector<projectairsim::Annotation> Annotations,
+    std::vector<uint64_t> PerformanceTiming) {
   std::vector<std::pair<ImageRequest, UnrealCameraRenderRequest::RenderResult>>
       CaptureResults;
 
@@ -970,13 +980,15 @@ void UUnrealCamera::OnRendered(
     }
   }
 
+  if (!PerformanceTiming.empty()) PerformanceTiming[2] = FPlatformTime::Cycles64();
+
   // Offload image message packing and publishing to a background task.
   // This passes a copy of the sim Camera, which takes a copy of the
   // shared_ptr to the sensor impl to use for publishing the image
   // message.
   (new FAutoDeleteAsyncTask<FImagePackingAsyncTask>(
        std::move(CaptureResults), CapturedCameraTransform, SimCamera,
-       std::move(Annotations)))
+       std::move(Annotations), std::move(PerformanceTiming)))
       ->StartBackgroundTask();
 
   // Reset flag to allow next frame capture to start

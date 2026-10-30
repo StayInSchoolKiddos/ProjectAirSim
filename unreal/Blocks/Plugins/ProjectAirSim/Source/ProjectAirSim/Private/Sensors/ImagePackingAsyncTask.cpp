@@ -153,6 +153,10 @@ void FImagePackingAsyncTask::DoWork() {
             ImgResponse.CameraOrientation.z(), Annotations));
   }
 
+  for (auto& Entry : ImageMessages) {
+    Entry.second.SetPerformanceTiming(PerformanceTiming);
+  }
+
   // Publish the whole pack of image messages
   Camera.PublishImages(std::move(ImageMessages));
 }

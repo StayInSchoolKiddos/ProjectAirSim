@@ -483,3 +483,17 @@ TEST(JSBSimApi, SetJSBSimPropertyWaitsWhileSetHoldsPropertyLock) {
   EXPECT_FLOAT_EQ(api.GetJSBSimProperty(kThreadSafeProperty),
                   kSecondWriteValue);
 }
+TEST(JSBSimApi, BatchedPropertiesRoundTripAndValidationBeforeWrite) {
+  auto robot = MakeLoadedJSBSimRobot();
+  projectairsim::JSBSimApi api(robot, nullptr);
+  const std::vector<std::string> names{"fcs/aileron-cmd-norm", "fcs/elevator-cmd-norm"};
+  ASSERT_TRUE(api.SetJSBSimProperties(names, {0.25f, -0.5f}));
+  const auto values = api.GetJSBSimProperties(names);
+  ASSERT_EQ(values.size(), 2u);
+  EXPECT_FLOAT_EQ(values[0], 0.25f);
+  EXPECT_FLOAT_EQ(values[1], -0.5f);
+  EXPECT_THROW(api.SetJSBSimProperties(names, {1.f}), std::invalid_argument);
+  EXPECT_THROW(api.SetJSBSimProperties({names[0], names[0]}, {1.f, 1.f}), std::invalid_argument);
+  EXPECT_FLOAT_EQ(api.GetJSBSimProperties(names)[0], 0.25f);
+  EXPECT_THROW(api.GetJSBSimProperties({}), std::invalid_argument);
+}

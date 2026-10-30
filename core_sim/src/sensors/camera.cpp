@@ -1057,7 +1057,8 @@ void Camera::Impl::PublishImages(std::map<ImageType, ImageMessage>&& images) {
     // Move the image data to sim camera to save for future GetImages() calls
     captured_images = std::move(images);
 
-    for (const auto& [image_type, image_msg] : captured_images) {
+    for (auto& [image_type, image_msg] : captured_images) {
+      image_msg.MarkPerformancePublication();
       // Publish captured image
       if (image_type == ImageType::kScene) {
         auto& image_entry = image_entries_[ImageType::kScene];
