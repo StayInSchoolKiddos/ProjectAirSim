@@ -2,6 +2,7 @@
 //
 // MIT License. All rights reserved.
 
+#include "tiguar_json_bridge.hpp"
 #include "jsbsim_physics.hpp"
 
 #include <algorithm>
@@ -89,6 +90,52 @@ JSBSimPhysicsBody::JSBSimPhysicsBody(const Robot& robot)
   InitializeJSBSimPhysicsBody(robot);
 }
 
+JSBSimPhysicsBody::JSBSimPhysicsBody() = default;
+JSBSimPhysicsBody::~JSBSimPhysicsBody() = default;
+
+bool JSBSimPhysicsBody::PrepareFleetControl() {
+  if (!tiguar_bridge_ || model_->GetPropertyValue("mideforge/exchange-enabled") < 0.5) return true;
+  if (model_->GetPropertyValue("mideforge/controller-fault") > 0.5) return false;
+  if (!tiguar_bridge_->Receive()) {
+    model_->SetPropertyValue("mideforge/controller-fault",1);
+    return false;
+  }
+  return true;
+}
+
+void JSBSimPhysicsBody::ApplyFleetControl(double dt) {
+  if (!tiguar_fleet_) return;
+  if (tiguar_bridge_ && model_->GetPropertyValue("mideforge/ardupilot-active") > 0.5) {
+    const auto& pwm=tiguar_bridge_->Pwm();
+    auto surface=[](uint16_t value) { return std::clamp((double(value)-1500)/500,-1.0,1.0); };
+    model_->SetPropertyValue("fcs/aileron-cmd-norm",surface(pwm[0]));
+    model_->SetPropertyValue("fcs/elevator-cmd-norm",surface(pwm[1]));
+    model_->SetPropertyValue("fcs/rudder-cmd-norm",surface(pwm[3]));
+    model_->SetPropertyValue("mideforge/throttle-command",std::clamp((double(pwm[2])-1000)/1000,0.0,1.0));
+  }
+  const double requested=model_->GetPropertyValue("mideforge/throttle-command");
+  tiguar_throttle_+=std::clamp(requested-tiguar_throttle_,-0.5*dt,0.5*dt);
+  model_->SetPropertyValue("fcs/throttle-cmd-norm",tiguar_throttle_);
+}
+
+void JSBSimPhysicsBody::PublishFleetState() {
+  if (!tiguar_bridge_ || model_->GetPropertyValue("mideforge/exchange-enabled") < 0.5) return;
+  auto value=[&](const char* property) {return model_->GetPropertyValue(property);};
+  const auto position=GetModelPosition();
+  const auto orientation=GetModelOrientation();
+  nlohmann::json state={
+    {"timestamp",model_->GetSimTime()},
+    {"position",{position.x(),position.y(),position.z()}},
+    {"quaternion",{orientation.w(),orientation.x(),orientation.y(),orientation.z()}},
+    {"velocity",{value("velocities/v-north-fps")*.3048,value("velocities/v-east-fps")*.3048,value("velocities/v-down-fps")*.3048}},
+    {"imu",{{"gyro",{value("velocities/p-rad_sec"),value("velocities/q-rad_sec"),value("velocities/r-rad_sec")}},
+            {"accel_body",{value("accelerations/a-pilot-x-ft_sec2")*.3048,value("accelerations/a-pilot-y-ft_sec2")*.3048,value("accelerations/a-pilot-z-ft_sec2")*.3048}}}},
+    {"airspeed",value("velocities/vtrue-fps")*.3048},
+    {"velocity_wind",{value("atmosphere/total-wind-north-fps")*.3048,value("atmosphere/total-wind-east-fps")*.3048,value("atmosphere/total-wind-down-fps")*.3048}}
+  };
+  tiguar_bridge_->Send(state);
+}
+
 void JSBSimPhysicsBody::InitializeJSBSimPhysicsBody(
     const Robot& robot) {
       const auto& links = sim_robot_.GetLinks();
@@ -103,6 +150,13 @@ void JSBSimPhysicsBody::InitializeJSBSimPhysicsBody(
   model_ = sim_robot_.GetJSBSimModel();
   jsbsim_dt_sec_ = sim_robot_.GetJSBSimDtSec();
   model_->Setdt(jsbsim_dt_sec_);
+  const auto settings=nlohmann::json::parse(robot.GetControllerSettings());
+  if (robot.GetJSBSimModelName()=="tig_calibrated" && settings.contains("tiguar-fleet")) {
+    tiguar_fleet_=true;
+    const auto& fleet=settings["tiguar-fleet"];
+    if (fleet.value("mode",std::string())=="ardupilot")
+      tiguar_bridge_=std::make_unique<TiguarJsonBridge>(fleet.value("bind_host",std::string("127.0.0.1")),fleet.at("json_port").get<int>(),fleet.value("timeout_ms",1000));
+  }
 
   // get difference betweeen JSBSim's initial geopoint position and home geopoint position
   const auto& world_geopoint = sim_robot_.GetEnvironment().home_geo_point.geo_point;
@@ -371,6 +425,28 @@ void JSBSimPhysicsModel::StepPhysicsBody(TimeNano dt_nanos,
 
     // Step 4 - Save new kinematics to body's referenced sim robot
     fp_body->WriteRobotData(next_kin);
+    fp_body->PublishFleetState();
+    if (fp_body->sim_robot_.GetJSBSimModelName() == "tig_calibrated") {
+      auto fdm = fp_body->model_;
+      auto state = fp_body->sim_robot_.GetTiguarVisualState();
+      const double t = fdm->GetSimTime();
+      const double previous = state.valid ? state.time : t;
+      const double dt = t >= previous ? t - previous : 0.0;
+      if (t < previous) state.phase = 0;
+      state.time = t;
+      state.rpm = fdm->GetPropertyValue("propulsion/engine/propeller-rpm");
+      state.phase = std::fmod(state.phase + std::max(0.0, state.rpm) * 6.0 * dt, 360.0);
+      constexpr double rad_to_deg = 57.29577951308232;
+      state.aileron_l = fdm->GetPropertyValue("fcs/left-aileron-pos-rad") * rad_to_deg;
+      state.aileron_r = fdm->GetPropertyValue("fcs/right-aileron-pos-rad") * rad_to_deg;
+      const double elevator = fdm->GetPropertyValue("fcs/elevator-pos-rad") * rad_to_deg;
+      const double rudder = fdm->GetPropertyValue("fcs/rudder-pos-rad") * rad_to_deg;
+      state.tail_l = elevator + rudder; state.tail_r = elevator - rudder;
+      state.valid = std::isfinite(t) && std::isfinite(state.rpm) && std::isfinite(state.phase)
+          && std::isfinite(state.aileron_l) && std::isfinite(state.aileron_r)
+          && std::isfinite(state.tail_l) && std::isfinite(state.tail_r);
+      fp_body->sim_robot_.SetTiguarVisualState(state);
+    }
   }
 }
 
@@ -500,6 +576,7 @@ Kinematics JSBSimPhysicsModel::CalcNextKinematicsNoCollision(
     const double integration_step_sec =
         std::min(remaining_time_sec, fp_body->jsbsim_dt_sec_);
     fp_body->model_->Setdt(integration_step_sec);
+    fp_body->ApplyFleetControl(integration_step_sec);
     fp_body->model_->Run();
     remaining_time_sec -= integration_step_sec;
   }

@@ -1,0 +1,126 @@
+// Tiguar visuals with UNMODIFIED SKYWALKER X8 placeholder flight dynamics.
+// Not a Tiguar aerodynamic or performance model.
+// Forward-axis alignment is baked into SM_Tiguar, as in the X8 visual model.
+{
+  "$schema": "../../../../projectairsim/src/projectairsim/schema/robot_config_schema.jsonc",
+  "physics-type": "jsbsim-physics",
+  "jsbsim-ground-mode": "constant",
+  "jsbsim-root-path": "/SimLibs/core_sim/jsbsim/models/",
+  "jsbsim-aircraft-path": "aircraft",
+  "jsbsim-engine-path": "engine",
+  "jsbsim-systems-path": "systems",
+  "jsbsim-model": "x8",
+  "jsbsim-dt": 0.004,
+  "links": [
+    {
+      "name": "Frame",
+      "inertial": {
+        "mass": 3.364,
+        "inertia": {
+          "type": "geometry",
+          "geometry": {
+            "box": {
+              "size": "0.82 2.10 0.18"
+            }
+          }
+        }
+      },
+      "collision": {
+        "enabled": true,
+        "restitution": 0.1,
+        "friction": 0.5
+      },
+      "visual": {
+        "origin": {
+          "xyz": "0 0 0",
+          "rpy-deg": "0 0 0"
+        },
+        "geometry": {
+          "type": "unreal_mesh",
+          "name": "/Drone/Tiguar/SM_Tiguar"
+        }
+      }
+    }
+  ],
+  "joints": [],
+  "controller": {
+    "id": "JSBSim_Controller",
+    "airframe-setup": "fixed-wing",
+    "type": "jsbsim-api"
+  },
+  "actuators": [],
+  "sensors": [
+    {
+      "id": "Chase",
+      "type": "camera",
+      "enabled": true,
+      "parent-link": "Frame",
+      "capture-interval": 0.033333,
+      "capture-settings": [
+        {
+          "image-type": 0,
+          "width": 1280,
+          "height": 720,
+          "fov-degrees": 75,
+          "capture-enabled": true,
+          "streaming-enabled": true,
+          "pixels-as-float": false,
+          "compress": false,
+          "target-gamma": 2.2
+        }
+      ],
+      "gimbal": {
+        "lock-roll": true,
+        "lock-pitch": true,
+        "lock-yaw": false
+      },
+      "origin": {
+        "xyz": "-8 -4 -3",
+        "rpy-deg": "0 -18.54198 26.56505"
+      }
+    },
+    {
+      "id": "Airspeed",
+      "type": "airspeed",
+      "enabled": true,
+      "parent-link": "Frame",
+      "forward-xyz": "1 0 0"
+    },
+    {
+      "id": "IMU1",
+      "type": "imu",
+      "enabled": true,
+      "parent-link": "Frame",
+      "accelerometer": {
+        "velocity-random-walk": 0.002353,
+        "tau": 800,
+        "bias-stability": 0.000353,
+        "turn-on-bias": "0 0 0"
+      },
+      "gyroscope": {
+        "angle-random-walk": 8.72644e-05,
+        "tau": 500,
+        "bias-stability": 2.23014e-05,
+        "turn-on-bias": "0 0 0"
+      }
+    },
+    {
+      "id": "GPS",
+      "type": "gps",
+      "enabled": true,
+      "parent-link": "Frame"
+    },
+    {
+      "id": "Barometer",
+      "type": "barometer",
+      "enabled": true,
+      "parent-link": "Frame"
+    },
+    {
+      "id": "Magnetometer",
+      "type": "magnetometer",
+      "enabled": true,
+      "parent-link": "Frame"
+    }
+  ]
+}

@@ -158,6 +158,13 @@ class Robot::Impl : public ActorImpl {
   void SetPhysicsType(const PhysicsType& phys_type);
   //used only by JSBSim physics and controller
   std::shared_ptr<::JSBSim::FGFDMExec> GetJSBSimModel() const;
+  std::string GetJSBSimModelName() const { return jsbsim_model_; }
+  TiguarVisualState GetTiguarVisualState() const {
+    std::lock_guard<std::mutex> lock(tiguar_visual_mutex_); return tiguar_visual_;
+  }
+  void SetTiguarVisualState(const TiguarVisualState& state) {
+    std::lock_guard<std::mutex> lock(tiguar_visual_mutex_); tiguar_visual_ = state;
+  }
   double GetJSBSimDtSec() const;
   const JSBSimGroundSettings& GetJSBSimGroundSettings() const;
   const std::string& GetPhysicsConnectionSettings() const;
@@ -216,6 +223,8 @@ class Robot::Impl : public ActorImpl {
   PhysicsType physics_type_ = PhysicsType::kNonPhysics;
   std::string jsbsim_script_;
   std::string jsbsim_model_;
+  TiguarVisualState tiguar_visual_;
+  mutable std::mutex tiguar_visual_mutex_;
   std::string jsbsim_root_path_;
   std::string jsbsim_aircraft_path_;
   std::string jsbsim_engine_path_;
@@ -458,6 +467,16 @@ void Robot::SetPhysicsType(const PhysicsType& phys_type) {
 
 std::shared_ptr<::JSBSim::FGFDMExec> Robot::GetJSBSimModel() const {
   return static_cast<Robot::Impl*>(pimpl_.get())->GetJSBSimModel();
+}
+
+std::string Robot::GetJSBSimModelName() const {
+  return static_cast<Robot::Impl*>(pimpl_.get())->GetJSBSimModelName();
+}
+TiguarVisualState Robot::GetTiguarVisualState() const {
+  return static_cast<Robot::Impl*>(pimpl_.get())->GetTiguarVisualState();
+}
+void Robot::SetTiguarVisualState(const TiguarVisualState& state) {
+  static_cast<Robot::Impl*>(pimpl_.get())->SetTiguarVisualState(state);
 }
 
 double Robot::GetJSBSimDtSec() const {

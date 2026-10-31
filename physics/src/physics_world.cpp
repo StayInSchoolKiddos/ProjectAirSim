@@ -175,6 +175,15 @@ void PhysicsWorld::SetWrenchesOnPhysicsBodies() {
 }
 
 void PhysicsWorld::StepPhysicsWorld(TimeNano dt_nanos) {
+  // Collect every aircraft's controls before any body advances this shared tick.
+  for (auto body : physics_bodies_) {
+    if (body->GetPhysicsType()!=PhysicsType::kJSBSimPhysics) continue;
+    const auto jsb=std::dynamic_pointer_cast<JSBSimPhysicsBody>(body);
+    if (jsb && !jsb->PrepareFleetControl()) {
+      SimClock::Get()->SimPause(true);
+      return;
+    }
+  }
   for (auto body : physics_bodies_) {
     switch (body->GetPhysicsType()) {
       case PhysicsType::kFastPhysics: {

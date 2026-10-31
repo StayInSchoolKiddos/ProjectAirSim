@@ -29,6 +29,7 @@
 // comment so that generated.h is always the last include file with clang-format
 #include "UnrealRobot.generated.h"
 
+class UPoseableMeshComponent;
 class AUnrealScene;
 class FProjectAirSimVehicleSubstepSampler;
 class UUnrealCamera;
@@ -102,6 +103,9 @@ class AUnrealRobot : public AActor {
   typedef UUnrealRobotLink::ActuatedFTransform ActuatedFTransform;
 
  private:
+  UPROPERTY() TObjectPtr<UPoseableMeshComponent> TiguarMesh;
+  void InitializeTiguarVisual();
+  void UpdateTiguarVisual();
   void InitializeId(const std::string& InId);
 
   void InitializeLinks(

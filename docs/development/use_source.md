@@ -77,12 +77,12 @@ Unreal Engine 5.x requires a compatible MSVC toolset. The repository's
 MSVC toolset prefixes:
 
 - UE 5.2: MSVC 14.37
-- UE 5.7: MSVC 14.44
+- UE 5.7 and 5.8: MSVC 14.44
 
 The script searches standard Visual Studio 2022 Community, Professional,
 Enterprise, and Build Tools locations and chooses the first matching installed
 toolset. There is no need to select the compiler manually when `UE_ROOT` points
-to UE 5.2 or 5.7.
+to UE 5.2, 5.7, or 5.8.
 
 On Linux, run the `build.sh` shell script.
 
@@ -113,6 +113,15 @@ running simulator.
 The sim lib components and unit test executables are built in the `projectairsim/build/` folder using CMake, and are automatically copied to the Unreal Blocks environment folder to be ready for building the plugin.
 
 The Plugin components are built in the `projectairsim/unreal/Blocks/` folder using the Unreal Engine's build system.
+
+Before building `BlocksEditor Win64 Development` directly in Visual Studio or
+with Unreal's `Build.bat`, run `build.cmd simlibs_release` with `UE_ROOT` set to
+the intended engine installation. Development uses the Release libraries and
+JSBSim DLL staged under the plugin's `SimLibs` directory; `simlibs_debug` alone
+does not provide them. For DebugGame, use `build.cmd blocks_debuggame`, which
+builds the Debug sim libs before both the game and editor targets. A missing
+`SimLibs/core_sim/jsbsim/lib/Release/JSBSim.dll` can stop UBT during runtime
+dependency preparation with exit code 6 before any C++ compilation occurs.
 
 The packaged outputs (sim lib components, UE Plugin, Blocks stand-alone executable) are copied to the `projectairsim/packages/` folder, where they can be picked up for external uses.
 

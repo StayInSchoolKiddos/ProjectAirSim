@@ -43,6 +43,13 @@ class TopicManager;
 class ServiceManager;
 class StateManager;
 
+// Written on the physics thread, read as one snapshot by Unreal.
+struct TiguarVisualState {
+  double time = 0, rpm = 0, phase = 0;
+  double aileron_l = 0, aileron_r = 0, tail_l = 0, tail_r = 0;
+  bool valid = false;
+};
+
 class Robot : public Actor {
  public:
   typedef std::function<void(const Kinematics&, TimeNano)> KinematicsCallback;
@@ -74,6 +81,9 @@ class Robot : public Actor {
   // used only by JSBSim physics and controller
   std::shared_ptr<JSBSim::FGFDMExec> GetJSBSimModel() const;
   double GetJSBSimDtSec() const;
+  std::string GetJSBSimModelName() const;
+  TiguarVisualState GetTiguarVisualState() const;
+  void SetTiguarVisualState(const TiguarVisualState& state);
   const JSBSimGroundSettings& GetJSBSimGroundSettings() const;
   const std::string& GetPhysicsConnectionSettings() const;
   void SetPhysicsConnectionSettings(const std::string& phys_conn_settings);

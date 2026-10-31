@@ -1,0 +1,35 @@
+// Tiguar visuals with UNMODIFIED SKYWALKER X8 placeholder flight dynamics.
+// Not a Tiguar aerodynamic or performance model.
+{
+  "$schema": "../../../../projectairsim/src/projectairsim/schema/scene_config_schema.jsonc",
+  "id": "SceneTiguarX8Placeholder",
+  "actors": [
+    {
+      "type": "robot",
+      "name": "Tiguar",
+      "origin": {
+        "xyz": "0 0 -120",
+        "rpy": "0 0 0"
+      },
+      "start-landed": false,
+      "robot-config": "robot_tiguar_jsbsim.jsonc"
+    }
+  ],
+  "clock": {
+    "type": "steppable",
+    "step-ns": 4000000,
+    "real-time-update-rate": 4000000,
+    "pause-on-start": true
+  },
+  "home-geo-point": {
+    "latitude": 29.4296741,
+    "longitude": -95.16384722,
+    "altitude": 7.5
+  },
+  "segmentation": {
+    "initialize-ids": true,
+    "ignore-existing": false,
+    "use-owner-name": true
+  },
+  "scene-type": "UnrealNative"
+}

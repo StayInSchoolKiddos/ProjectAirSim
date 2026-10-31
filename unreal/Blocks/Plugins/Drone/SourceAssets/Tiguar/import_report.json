@@ -1,0 +1,59 @@
+{
+  "source": "C:\\Users\\Justin\\dev\\ProjectAirSim\\unreal\\Blocks\\Plugins\\Drone\\SourceAssets\\Tiguar",
+  "included": [
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_BOOM_L.Tiguar_Black__CS_BOOM_L",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_BOOM_R.Tiguar_Black__CS_BOOM_R",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LG.Tiguar_Black__CS_LG",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_Lhub.Tiguar_Black__CS_Lhub",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LLR.Tiguar_Black__CS_LLR",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LMA.Tiguar_Black__CS_LMA",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LMA_001.Tiguar_Black__CS_LMA_001",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LMF.Tiguar_Black__CS_LMF",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LMF_001.Tiguar_Black__CS_LMF_001",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LMVS.Tiguar_Black__CS_LMVS",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LMW.Tiguar_Black__CS_LMW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_Lnt.Tiguar_Black__CS_Lnt",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LUR.Tiguar_Black__CS_LUR",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_LW.Tiguar_Black__CS_LW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RG.Tiguar_Black__CS_RG",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_Rhub.Tiguar_Black__CS_Rhub",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RLR.Tiguar_Black__CS_RLR",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RMA.Tiguar_Black__CS_RMA",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RMA_001.Tiguar_Black__CS_RMA_001",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RMF.Tiguar_Black__CS_RMF",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RMF_001.Tiguar_Black__CS_RMF_001",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RMVS.Tiguar_Black__CS_RMVS",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RMW.Tiguar_Black__CS_RMW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_Rnt.Tiguar_Black__CS_Rnt",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RUR.Tiguar_Black__CS_RUR",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_RW.Tiguar_Black__CS_RW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_SG.Tiguar_Black__CS_SG",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_SGnt.Tiguar_Black__CS_SGnt",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_SGPANT.Tiguar_Black__CS_SGPANT",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_Shub.Tiguar_Black__CS_Shub",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_SPINNER_1.Tiguar_Black__CS_SPINNER_1",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_SW.Tiguar_Black__CS_SW",
+    "/Drone/Tiguar/Parts/Tiguar_Black_FUSELAGE.Tiguar_Black_FUSELAGE"
+  ],
+  "excluded": [
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_COLL_FUSELAGE.Tiguar_Black__CS_COLL_FUSELAGE",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_COLL_LMW.Tiguar_Black__CS_COLL_LMW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_COLL_LW.Tiguar_Black__CS_COLL_LW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_COLL_RMW.Tiguar_Black__CS_COLL_RMW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_COLL_RW.Tiguar_Black__CS_COLL_RW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_COLL_SW.Tiguar_Black__CS_COLL_SW",
+    "/Drone/Tiguar/Parts/Tiguar_Black__CS_MOUNT.Tiguar_Black__CS_MOUNT"
+  ],
+  "physics": "Skywalker X8 placeholder; not Tiguar flight dynamics",
+  "bounds_origin_cm": [
+    20.88117218017578,
+    -0.03131866455078125,
+    21.401528358459473
+  ],
+  "dimensions_cm": [
+    259.5410919189453,
+    378.2758331298828,
+    104.29127311706543
+  ],
+  "baked_yaw_degrees": 180
+}

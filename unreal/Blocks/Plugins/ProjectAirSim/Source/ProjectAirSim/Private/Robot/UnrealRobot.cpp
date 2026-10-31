@@ -5,6 +5,9 @@
 // The Unreal robot implementation.
 
 #include "UnrealRobot.h"
+#include "Components/PoseableMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Materials/MaterialInterface.h"
 
 #include <algorithm>
 #include <array>
@@ -446,6 +449,7 @@ void AUnrealRobot::Initialize(const projectairsim::Robot& InSimRobot,
   InitializeId(InSimRobot.GetID());
   InitializeLinks(InSimRobot.GetLinks(), RootLinks, bWithUnrealPhysics);
   InitializeJoints(InSimRobot.GetJoints());
+  InitializeTiguarVisual();
 
   if (bIsProjectAirSimVehicle) {
     // ProjectAirSim vehicle physics: initialize the root component and
@@ -461,6 +465,46 @@ void AUnrealRobot::Initialize(const projectairsim::Robot& InSimRobot,
   // Set the initial pose from the robot's kinematics
   SetRobotKinematics(InSimRobot.GetKinematics(), 0);  // timestamp=0
   MoveRobotToUnrealPose(false);  // move without collision sweep
+}
+
+void AUnrealRobot::InitializeTiguarVisual() {
+  if (SimRobot.GetJSBSimModelName() != "tig_calibrated") return;
+  auto* Mesh = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Tiguar/SK_Tiguar_Blue.SK_Tiguar_Blue"));
+  if (!Mesh) { UE_LOG(LogTemp, Error, TEXT("Missing articulated Tiguar asset")); return; }
+  TiguarMesh = NewObject<UPoseableMeshComponent>(this, TEXT("ArticulatedTiguar"));
+  TiguarMesh->SetupAttachment(RobotRootLink);
+  TiguarMesh->SetSkinnedAssetAndUpdate(Mesh);
+  TiguarMesh->SetRelativeScale3D(FVector(1.02782));
+  TiguarMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  const TCHAR* Materials[] = { TEXT("RoyalBlue"), TEXT("Rubber"), TEXT("Silver"), TEXT("Graphite"), TEXT("YellowTips") };
+  for (int I = 0; I < 5; ++I) {
+    const FString Path = FString::Printf(TEXT("/Game/Tiguar/Flight/MI_%s.MI_%s"), Materials[I], Materials[I]);
+    if (auto* Material = LoadObject<UMaterialInterface>(nullptr, *Path)) TiguarMesh->SetMaterial(I, Material);
+  }
+  TiguarMesh->RegisterComponent();
+  // Hide only the legacy rigid body; retain the link transform and its sensor children.
+  RobotRootLink->SetVisibility(false, false);
+  TiguarMesh->SetVisibility(true, false);
+}
+
+void AUnrealRobot::UpdateTiguarVisual() {
+  if (!TiguarMesh) return;
+  const auto State = SimRobot.GetTiguarVisualState();
+  if (!State.valid) return;
+  const auto* Mesh = Cast<USkeletalMesh>(TiguarMesh->GetSkinnedAsset());
+  if (!Mesh) return;
+  const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+  auto Apply = [&](const TCHAR* Name, double Degrees) {
+    const int32 Index = Ref.FindBoneIndex(Name); if (Index == INDEX_NONE) return;
+    FTransform Pose = Ref.GetRefBonePose()[Index];
+    Pose.SetRotation((Pose.GetRotation() * FQuat(FVector::YAxisVector, FMath::DegreesToRadians(Degrees))).GetNormalized());
+    for (int32 Parent = Ref.GetParentIndex(Index); Parent != INDEX_NONE; Parent = Ref.GetParentIndex(Parent))
+      Pose = Pose * Ref.GetRefBonePose()[Parent];
+    TiguarMesh->SetBoneTransformByName(Name, Pose, EBoneSpaces::ComponentSpace);
+  };
+  Apply(TEXT("aileron_L"), State.aileron_l); Apply(TEXT("aileron_R"), State.aileron_r);
+  Apply(TEXT("ruddervator_L"), State.tail_l); Apply(TEXT("ruddervator_R"), State.tail_r);
+  Apply(TEXT("flap_L"), 0); Apply(TEXT("flap_R"), 0); Apply(TEXT("propeller"), State.phase);
 }
 
 void AUnrealRobot::InitializeId(const std::string& InId) {
@@ -1823,6 +1867,7 @@ void AUnrealRobot::Tick(float DeltaTime) {
   if (UGameplayStatics::IsGamePaused(this)) return;
 
   UpdateCachedTerrainElevation();
+  UpdateTiguarVisual();
 
   // Main conditions by physics type
   if (SimRobot.GetPhysicsType() == projectairsim::PhysicsType::kUnrealPhysics &&

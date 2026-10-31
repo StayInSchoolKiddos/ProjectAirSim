@@ -21,11 +21,16 @@ namespace projectairsim {
 // -----------------------------------------------------------------------------
 // class JSBSimPhysicsBody
 
+class TiguarJsonBridge;
+
 class JSBSimPhysicsBody : public BasePhysicsBody {
  public:
-  JSBSimPhysicsBody() {}
+  JSBSimPhysicsBody();
   explicit JSBSimPhysicsBody(const Robot& robot);
-  ~JSBSimPhysicsBody() override {}
+  ~JSBSimPhysicsBody() override;
+  bool PrepareFleetControl();
+  void ApplyFleetControl(double dt);
+  void PublishFleetState();
 
   void InitializeJSBSimPhysicsBody(const Robot& robot);
   double GetJSBSimDtSec() const { return jsbsim_dt_sec_; }
@@ -80,6 +85,9 @@ class JSBSimPhysicsBody : public BasePhysicsBody {
   std::shared_ptr<JSBSim::FGFDMExec> model_;
   double jsbsim_dt_sec_ = kDefaultJSBSimDtSec;
   bool jsbsim_initialized_ = false;
+  std::unique_ptr<TiguarJsonBridge> tiguar_bridge_;
+  bool tiguar_fleet_ = false;
+  double tiguar_throttle_ = 0;
 };
 
 // -----------------------------------------------------------------------------
