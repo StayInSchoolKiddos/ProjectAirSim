@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 
 #include "algorithms.hpp"
@@ -221,6 +222,7 @@ class Scene::Impl : public ComponentWithTopicsAndServiceMethods {
   std::function<void(TimeNano)> physics_step_callback_;
   std::function<void()> physics_stop_callback_;
   ScheduledExecutor executor_;
+  std::mutex step_completion_mutex_;
   TimeNano sim_time_;
   Topic clock_topic_;
   bool clock_topic_registered_ = false;
@@ -713,6 +715,7 @@ std::string Scene::Impl::SimPause(bool do_pause) {
   TimeNano result_time;
   if (do_pause) {
     SimClock::Get()->SimPause(true);
+    std::lock_guard<std::mutex> completed_step(step_completion_mutex_);
     result_time = SimClock::Get()->NowSimNanos();
     return "Sim time paused at t = " + std::to_string(result_time);
   } else {
@@ -746,6 +749,9 @@ TimeNano Scene::Impl::ContinueForSimTime(TimeNano delta_time,
     while (!IsSimPaused()) {
       std::this_thread::yield();
     }
+    // The clock reaches its target at the beginning of SceneTick. Wait for
+    // physics and sensor updates to finish before paused-state RPCs can write.
+    std::lock_guard<std::mutex> completed_step(step_completion_mutex_);
   }
 
   return SimClock::Get()->NowSimNanos();
@@ -1013,6 +1019,7 @@ void Scene::Impl::UnregisterAllServiceMethods() {
 
 // Main scene tick loop to move simulation robots over each sim clock time step
 bool Scene::Impl::SceneTick() {
+  std::lock_guard<std::mutex> completed_step(step_completion_mutex_);
   if (state_manager_.IsDistributed() && !state_manager_.IsConnected()) {
     state_manager_.ConnectSims();
   }

@@ -41,6 +41,7 @@ class TiguarJsonBridge {
   TiguarJsonBridge(const TiguarJsonBridge&)=delete;
   TiguarJsonBridge& operator=(const TiguarJsonBridge&)=delete;
   const std::array<uint16_t,16>& Pwm() const {return pwm_;}
+  uint16_t Rate() const { return rate_; }
   bool Receive() {
     const auto deadline=std::chrono::steady_clock::now()+std::chrono::milliseconds(timeout_ms_);
     while (std::chrono::steady_clock::now()<deadline) {
@@ -57,12 +58,18 @@ class TiguarJsonBridge {
       if (count!=40) continue; // Pinned configuration uses 16 outputs.
       uint16_t magic=0,rate=0; uint32_t frame=0;
       std::memcpy(&magic,bytes.data(),2); std::memcpy(&rate,bytes.data()+2,2); std::memcpy(&frame,bytes.data()+4,4);
-      if (magic!=18458 || rate!=250) continue;
+      if (magic!=18458 || rate==0) continue;
       if (have_peer_ && (sender.sin_addr.s_addr!=peer_.sin_addr.s_addr || sender.sin_port!=peer_.sin_port)) continue;
-      if (have_frame_ && frame==frame_) { if (!last_sensor_.empty()) SendRaw(last_sensor_); continue; }
+      if (have_frame_ && frame==frame_) {
+        // Discard queued retransmissions after a recent reply. Replaying every
+        // response makes ArduPilot consume the same sensor timestamp repeatedly.
+        if (!last_sensor_.empty() && std::chrono::steady_clock::now()-last_send_ > std::chrono::milliseconds(100))
+          SendRaw(last_sensor_);
+        continue;
+      }
       if (have_frame_ && frame<frame_) {error_="SITL frame counter reset";return false;}
       if (have_frame_ && frame!=frame_+1) {error_="SITL frame sequence gap";return false;}
-      peer_=sender;have_peer_=true;frame_=frame;have_frame_=true;
+      peer_=sender;have_peer_=true;frame_=frame;have_frame_=true;rate_=rate;
       std::memcpy(pwm_.data(),bytes.data()+8,32);
       return true;
     }
@@ -74,6 +81,7 @@ class TiguarJsonBridge {
   const std::string& Error() const {return error_;}
  private:
   void SendRaw(const std::string& text) {
+    last_send_=std::chrono::steady_clock::now();
     if (have_peer_) sendto(socket_,text.data(),static_cast<int>(text.size()),0,reinterpret_cast<sockaddr*>(&peer_),sizeof(peer_));
   }
   void Close() {
@@ -93,8 +101,9 @@ class TiguarJsonBridge {
 #endif
   Socket socket_=invalid_socket;
   sockaddr_in peer_{};bool have_peer_=false,have_frame_=false;
-  uint32_t frame_=0;int timeout_ms_=1000;
+  uint32_t frame_=0;uint16_t rate_=0;int timeout_ms_=1000;
   std::array<uint16_t,16> pwm_{};
   std::string last_sensor_,error_;
+  std::chrono::steady_clock::time_point last_send_{};
 };
 }}

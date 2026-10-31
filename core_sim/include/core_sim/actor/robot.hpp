@@ -48,6 +48,7 @@ struct TiguarVisualState {
   double time = 0, rpm = 0, phase = 0;
   double aileron_l = 0, aileron_r = 0, tail_l = 0, tail_r = 0;
   bool valid = false;
+  bool selected = false;
 };
 
 class Robot : public Actor {

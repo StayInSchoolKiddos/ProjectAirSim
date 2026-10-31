@@ -94,9 +94,10 @@ JSBSimPhysicsBody::JSBSimPhysicsBody() = default;
 JSBSimPhysicsBody::~JSBSimPhysicsBody() = default;
 
 bool JSBSimPhysicsBody::PrepareFleetControl() {
+  if (tiguar_fleet_ && model_->GetPropertyValue("mideforge/controller-fault") > 0.5) return false;
   if (!tiguar_bridge_ || model_->GetPropertyValue("mideforge/exchange-enabled") < 0.5) return true;
   if (model_->GetPropertyValue("mideforge/controller-fault") > 0.5) return false;
-  if (!tiguar_bridge_->Receive()) {
+  if (!tiguar_bridge_->Receive() || (model_->GetPropertyValue("mideforge/ardupilot-active") > 0.5 && tiguar_bridge_->Rate() != 250)) {
     model_->SetPropertyValue("mideforge/controller-fault",1);
     return false;
   }
@@ -219,10 +220,19 @@ void JSBSimPhysicsBody::InitializeJSBSim(){
   init.SetWindNEDFpsIC(wind_velocity.x() * MathUtils::meters_to_feets, wind_velocity.y() * MathUtils::meters_to_feets,
                        wind_velocity.z() * MathUtils::meters_to_feets);
                        
+  if (tiguar_fleet_) {
+    const auto config = nlohmann::json::parse(sim_robot_.GetControllerSettings());
+    const double speed = config["tiguar-fleet"].at("initial_airspeed_mps").get<double>();
+    if (!std::isfinite(speed) || speed < 22 || speed > 40)
+      throw std::runtime_error("Invalid Tiguar airborne initial speed");
+    init.SetVtrueFpsIC(speed / .3048);
+  }
   // run initial conditions
   if(model_->RunIC() == false){
     throw std::runtime_error("JSBSim failed to initialize");
   }
+
+  if (tiguar_fleet_) model_->SetPropertyValue("propulsion/set-running", -1);
 
   // Now FGInertial has set the ellipse - safe to install custom ground callback
   if (model_->GetInertial() != nullptr) {
@@ -406,6 +416,12 @@ void JSBSimPhysicsModel::StepPhysicsBody(TimeNano dt_nanos,
 
     // Step 2 - Calculate kinematics
     next_kin = CalcNextKinematicsNoCollision(dt_sec, fp_body);
+    if (fp_body->tiguar_fleet_ && fp_body->model_->GetPropertyValue("mideforge/controller-fault") > 0.5) {
+      auto visual = fp_body->sim_robot_.GetTiguarVisualState();
+      visual.valid = false;
+      fp_body->sim_robot_.SetTiguarVisualState(visual);
+      return; // Never publish invalid transforms or sensor packets.
+    }
     
 
     // Step 3 - Calculate kinematics with collision response if needed
@@ -434,6 +450,7 @@ void JSBSimPhysicsModel::StepPhysicsBody(TimeNano dt_nanos,
       const double dt = t >= previous ? t - previous : 0.0;
       if (t < previous) state.phase = 0;
       state.time = t;
+      state.selected = fdm->GetPropertyValue("mideforge/view-selected") > 0.5;
       state.rpm = fdm->GetPropertyValue("propulsion/engine/propeller-rpm");
       state.phase = std::fmod(state.phase + std::max(0.0, state.rpm) * 6.0 * dt, 360.0);
       constexpr double rad_to_deg = 57.29577951308232;
@@ -577,7 +594,19 @@ Kinematics JSBSimPhysicsModel::CalcNextKinematicsNoCollision(
         std::min(remaining_time_sec, fp_body->jsbsim_dt_sec_);
     fp_body->model_->Setdt(integration_step_sec);
     fp_body->ApplyFleetControl(integration_step_sec);
-    fp_body->model_->Run();
+    const bool advanced = fp_body->model_->Run();
+    if (fp_body->tiguar_fleet_) {
+      bool valid = advanced;
+      for (const char* property : {"position/lat-geod-deg", "position/long-gc-deg", "position/h-sl-ft",
+           "velocities/vtrue-fps", "velocities/p-rad_sec", "velocities/q-rad_sec", "velocities/r-rad_sec",
+           "attitude/phi-rad", "attitude/theta-rad", "attitude/heading-true-rad", "propulsion/engine/propeller-rpm"})
+        valid = valid && std::isfinite(fp_body->model_->GetPropertyValue(property));
+      if (!valid) {
+        fp_body->model_->SetPropertyValue("mideforge/controller-fault", 2);
+        SimClock::Get()->SimPause(true);
+        return fp_body->kinematics_;
+      }
+    }
     remaining_time_sec -= integration_step_sec;
   }
   fp_body->model_->Setdt(fp_body->jsbsim_dt_sec_);

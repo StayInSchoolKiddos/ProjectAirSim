@@ -491,6 +491,11 @@ void AUnrealRobot::UpdateTiguarVisual() {
   if (!TiguarMesh) return;
   const auto State = SimRobot.GetTiguarVisualState();
   if (!State.valid) return;
+  if (State.selected) {
+    if (auto* Controller = GetWorld()->GetFirstPlayerController()) {
+      if (Controller->GetViewTarget() != this) Controller->SetViewTarget(this);
+    }
+  }
   const auto* Mesh = Cast<USkeletalMesh>(TiguarMesh->GetSkinnedAsset());
   if (!Mesh) return;
   const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
@@ -1995,6 +2000,15 @@ void AUnrealRobot::Tick(float DeltaTime) {
 // Sets the viewport view for this actor which is used when this is the active
 // view target by setting the OutResult view info values.
 void AUnrealRobot::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) {
+  // Fleet viewport chase view has no image capture or sensor streaming cost.
+  // Existing EO/IR camera behavior is used whenever a capture is configured.
+  if (TiguarMesh && GetActiveStreamingCapture() == nullptr) {
+    const FRotator Heading(0, GetActorRotation().Yaw, 0);
+    OutResult.Location = GetActorLocation() + Heading.RotateVector(FVector(-850, -400, 280));
+    OutResult.Rotation = (GetActorLocation() - OutResult.Location).Rotation();
+    OutResult.FOV = 75;
+    return;
+  }
   USceneCaptureComponent2D* Capture = GetActiveStreamingCapture();
 
   if (bFindCameraComponentWhenViewTarget == false || Capture == nullptr) {
